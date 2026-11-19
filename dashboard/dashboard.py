@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import numpy as np
@@ -7,11 +8,11 @@ import pandas as pd
 import streamlit as st
 
 # ---------- Konfigurasi halaman ----------
-st.set_page_config(page_title="Dashboard Kualitas Udara Beijing", page_icon="🌫️", layout="wide")
+st.set_page_config(page_title="Dashboard Kualitas Udara Beijing", layout="wide")
 
 GREY, RED, BLUE = "#BFC5CC", "#D1495B", "#2E86AB"
 BATAS = 75  # batas harian PM2.5 (µg/m³)
-BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 URUT_KATEGORI = ["Baik", "Sedang", "Tidak sehat bagi sensitif", "Tidak sehat", "Sangat tidak sehat", "Berbahaya"]
 WARNA_KATEGORI = ["#4C9F70", "#E9C46A", "#F4A261", "#E76F51", "#B5446E", "#6D2E46"]
 
@@ -38,7 +39,12 @@ pilih_stasiun = st.sidebar.multiselect("Stasiun", semua_stasiun, default=semua_s
 if isinstance(rentang, tuple) and len(rentang) == 2:
     awal, akhir = rentang
 else:
-    awal, akhir = tgl_min, tgl_max
+    # Pengguna baru memilih satu tanggal: data diperlakukan sebagai satu hari dan diberi keterangan
+    awal = akhir = rentang[0] if isinstance(rentang, tuple) else rentang
+    st.sidebar.info(
+        f"Baru satu tanggal yang dipilih. Dashboard menampilkan data untuk satu hari ({awal}). "
+        "Pilih tanggal akhir untuk menampilkan rentang tanggal."
+    )
 
 data = df[
     (df["tanggal"].dt.date >= awal)
@@ -46,7 +52,7 @@ data = df[
     & (df["station"].isin(pilih_stasiun))
 ]
 
-st.title("🌫️ Dashboard Kualitas Udara Beijing")
+st.title("Dashboard Kualitas Udara Beijing")
 st.caption("Data PM2.5 harian dari 12 stasiun pemantau (Maret 2013 - Februari 2017). Batas harian acuan: 75 µg/m³.")
 
 if data.empty:
@@ -69,7 +75,7 @@ c3.metric("Stasiun tertinggi", per_stasiun["rata_PM25"].idxmax())
 c4.metric("Bulan tertinggi", BULAN[per_bulan.idxmax() - 1])
 
 tab1, tab2, tab3, tab4 = st.tabs(
-    ["📈 Tren & Musiman (Pertanyaan 1)", "🏙️ Perbandingan Stasiun (Pertanyaan 2)", "🎨 Kategori Kualitas Udara", "🗺️ Peta Stasiun"]
+    ["Tren dan Musiman (Pertanyaan 1)", "Perbandingan Stasiun (Pertanyaan 2)", "Kategori Kualitas Udara", "Peta Stasiun"]
 )
 
 # ---------- Tab 1 ----------
@@ -84,7 +90,16 @@ with tab1:
         puncak = tren.nlargest(3)
         ax.scatter(puncak.index, puncak.values, color=RED, zorder=3)
         for t, v in puncak.items():
-            ax.annotate(f"{v:.0f}", (t, v), textcoords="offset points", xytext=(0, 7), ha="center", fontsize=8, color=RED)
+            ax.annotate(f"{BULAN[t.month - 1]} {t.year}\n{v:.0f} µg/m³", (t, v), textcoords="offset points",
+                        xytext=(0, 8), ha="center", fontsize=7, color=RED)
+        ax.set_ylim(0, tren.max() * 1.3)
+        if len(tren) > 1:
+            ax.set_xlim(tren.index[0], tren.index[-1])
+        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonth=[3, 9]) if len(tren) > 12 else mdates.MonthLocator())
+        ax.xaxis.set_major_formatter(
+            plt.FuncFormatter(lambda x, _: f"{BULAN[mdates.num2date(x).month - 1]} {mdates.num2date(x).year}")
+        )
+        ax.tick_params(axis="x", rotation=45)
         ax.set_title("Tren bulanan PM2.5", loc="left", fontweight="bold")
         ax.set_ylabel("PM2.5 rata-rata (µg/m³)")
         st.pyplot(fig)
@@ -96,6 +111,8 @@ with tab1:
         for b in bars:
             ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 1.5, f"{b.get_height():.0f}", ha="center", fontsize=7)
         ax.set_title(f"Per bulan: tertinggi {BULAN[tinggi - 1]}, terendah {BULAN[rendah - 1]}", loc="left", fontweight="bold", fontsize=10)
+        ax.tick_params(axis="x", rotation=45)
+        ax.set_ylabel("PM2.5 rata-rata (µg/m³)")
         st.pyplot(fig)
 
     per = data.groupby("periode")["PM25"].mean()
@@ -107,7 +124,8 @@ with tab1:
         label = f"{v:.1f}" + ("" if b is bars[0] else f"\n({pct:+.1f}%)")
         ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 1, label, ha="center", fontsize=8)
     ax.set_ylim(0, per.max() * 1.25)
-    ax.set_title("Rata-rata PM2.5 per periode (Maret-Februari), perubahan vs periode pertama", loc="left", fontweight="bold", fontsize=10)
+    ax.set_title("Rata-rata PM2.5 per periode (Maret-Februari)\nPerubahan dibandingkan dengan periode pertama", loc="left", fontweight="bold", fontsize=10)
+    ax.set_ylabel("PM2.5 rata-rata (µg/m³)")
     st.pyplot(fig)
 
 # ---------- Tab 2 ----------
@@ -125,13 +143,13 @@ with tab2:
     axes[1].barh(b.index, b["persen_hari_lewat"], color=wb)
     for i, v in enumerate(b["persen_hari_lewat"]):
         axes[1].text(v + 0.5, i, f"{v:.1f}%", va="center", fontsize=8)
-    axes[1].set_title("% hari melebihi 75 µg/m³", loc="left", fontweight="bold")
+    axes[1].set_title("Persentase hari melebihi 75 µg/m³", loc="left", fontweight="bold")
     axes[1].xaxis.set_major_formatter(mtick.PercentFormatter())
     axes[1].set_xlim(0, b["persen_hari_lewat"].max() * 1.15)
     plt.tight_layout()
     st.pyplot(fig)
     st.dataframe(per_stasiun.sort_values("rata_PM25", ascending=False).round(1).rename(
-        columns={"rata_PM25": "Rata-rata PM2.5", "persen_hari_lewat": "% hari > 75"}))
+        columns={"rata_PM25": "Rata-rata PM2.5", "persen_hari_lewat": "Persentase hari melebihi 75 µg/m³"}))
 
 # ---------- Tab 3 ----------
 with tab3:
@@ -143,7 +161,7 @@ with tab3:
     fig, ax = plt.subplots(figsize=(10, 5))
     kat_persen.plot(kind="barh", stacked=True, color=warna_k, ax=ax, width=0.75)
     ax.set_title("Komposisi kategori kualitas udara harian per stasiun", loc="left", fontweight="bold")
-    ax.set_xlabel("% hari")
+    ax.set_xlabel("Persentase hari")
     ax.set_ylabel("")
     ax.xaxis.set_major_formatter(mtick.PercentFormatter())
     ax.legend(title="Kategori PM2.5", bbox_to_anchor=(1.01, 1), loc="upper left", frameon=False)
@@ -152,7 +170,7 @@ with tab3:
 
 # ---------- Tab 4 ----------
 with tab4:
-    st.write("Ukuran dan warna titik menunjukkan rata-rata PM2.5 stasiun (merah = lebih tinggi). Koordinat stasiun adalah perkiraan.")
+    st.write("Ukuran dan warna titik menunjukkan rata-rata PM2.5 stasiun (merah = lebih tinggi). Koordinat stasiun bersumber dari Foreback dkk. (2022), Atmospheric Chemistry and Physics, 22, 11089-11104.")
     peta = per_stasiun.join(data.groupby("station")[["lat", "lon"]].first()).reset_index()
     norm = (peta["rata_PM25"] - peta["rata_PM25"].min()) / max(peta["rata_PM25"].max() - peta["rata_PM25"].min(), 1e-9)
     peta["color"] = [f"#{int(230 - 30 * (1 - n)):02x}{int(190 - 130 * n):02x}{int(70 - 10 * n):02x}" for n in norm]

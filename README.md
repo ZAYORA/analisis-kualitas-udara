@@ -19,7 +19,7 @@ submission
 
 ## Setup Environment
 
-Pastikan Python 3.9+ sudah terpasang. Disarankan memakai virtual environment.
+Pastikan Python 3.11 atau lebih baru sudah terpasang (versi pada `requirements.txt` diuji dengan Python 3.12). Disarankan memakai virtual environment.
 
 ```
 python -m venv venv
@@ -40,7 +40,12 @@ Dashboard akan terbuka otomatis di browser (biasanya http://localhost:8501).
 
 ## Menjalankan Notebook
 
-Buka `notebook.ipynb` di Jupyter / Google Colab, pastikan folder `data/` berisi 12 berkas CSV stasiun, lalu jalankan semua sel dari atas. Sel terakhir menghasilkan `dashboard/main_data.csv`.
+Buka `notebook.ipynb` di Jupyter atau Google Colab, pastikan folder `data/` berisi 12 berkas CSV stasiun, lalu jalankan semua sel dari atas. Sel terakhir menghasilkan `dashboard/main_data.csv`.
+
+## Sumber Data dan Koordinat
+
+- Data kualitas udara: [Air Quality Dataset](https://github.com/marceloreis/HTI/tree/master) (PRSA Beijing Multi-Site Air Quality Data).
+- Koordinat stasiun: Tabel S1 pada *Supplement* Foreback dkk. (2022), *Atmospheric Chemistry and Physics*, 22, 11089-11104, https://doi.org/10.5194/acp-22-11089-2022-supplement.
 
 ## Tautan Dashboard
 
